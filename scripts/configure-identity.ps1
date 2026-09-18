@@ -7,7 +7,8 @@ $ErrorActionPreference = 'Stop'
 $federated = @{
   name = 'github-production'
   issuer = 'https://token.actions.githubusercontent.com'
-  subject = 'repo:cezp/Event-QR:environment:production'
+  # Immutable owner/repository IDs required for repositories created after July 2026.
+  subject = 'repo:cezp@46568792/Event-QR@1375817888:environment:production'
   audiences = @('api://AzureADTokenExchange')
 }
 New-Item -ItemType Directory -Force -Path '.local' | Out-Null
@@ -16,6 +17,9 @@ $existing = az ad app federated-credential list --id $AppId --query "[?name=='gi
 if (-not $existing) {
   az ad app federated-credential create --id $AppId --parameters '@.local/federated.json' --output none
   if ($LASTEXITCODE -ne 0) { throw 'Cannot create OIDC credential' }
+} else {
+  az ad app federated-credential update --id $AppId --federated-credential-id $existing --parameters '@.local/federated.json' --output none
+  if ($LASTEXITCODE -ne 0) { throw 'Cannot update OIDC credential' }
 }
 az role assignment create --assignee-object-id $ObjectId --assignee-principal-type ServicePrincipal --role Contributor --scope "/subscriptions/$SubscriptionId/resourceGroups/rg-eventy-samychswoich" --output none
 if ($LASTEXITCODE -ne 0) { throw 'Cannot assign resource-group role' }

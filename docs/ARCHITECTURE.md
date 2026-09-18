@@ -42,6 +42,10 @@ Workflow Backup event data zapisuje raz na tydzień prywatny eksport w kontenerz
 
 Organizator powinien ustalić i przekazać rodzicom rzeczywistą podstawę przetwarzania, kontakt, zasady uczestnictwa i okres retencji. Aplikacja nie zgaduje tych ustaleń ani nie usuwa automatycznie historii dzieci. Procedurę usuwania należy realizować po ustaleniu retencji i zakresu kopii zapasowych.
 
+## Tożsamość wdrożeniowa
+
+Federacja Entra ufa dokładnemu subject repo:cezp@46568792/Event-QR@1375817888:environment:production. GitHub używa niezmiennych identyfikatorów właściciela i repozytorium dla nowych repozytoriów od lipca 2026; stary subject z samymi nazwami nie działa. Źródło: https://docs.github.com/en/actions/reference/security/oidc. Środowisko production akceptuje tylko gałąź main.
+
 ## Koszt i dostępność
 
 Domyślnie SWA Free: statyczne pliki, zarządzane API, własna domena i TLS. Storage jest płatny za zajętość i operacje. Nie ma gwarancji zerowego kosztu i brak SLA Free. Dla kilkuset odsłon głównym niewielkim kosztem powinno być Storage; weryfikuj koszt w subskrypcji. Tryb przerwy blokuje rejestracje i obsługę, zachowując landing oraz możliwość zalogowania administratora. Nie usuwa zasobów ani danych.
