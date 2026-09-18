@@ -1,0 +1,33 @@
+name: Backup event data
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 2 * * 1"
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Save private backup without exposing personal data in CI logs
+        env:
+          AZURE_RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+          AZURE_STORAGE: ${{ vars.AZURE_STORAGE_ACCOUNT }}
+        run: |
+          connection=$(az storage account show-connection-string -g "$AZURE_RG" -n "$AZURE_STORAGE" --query connectionString -o tsv)
+          echo "::add-mask::$connection"
+          export STORAGE_CONNECTION_STRING="$connection"
+          node scripts/backup.mjs

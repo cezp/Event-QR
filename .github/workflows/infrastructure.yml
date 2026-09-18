@@ -1,0 +1,50 @@
+name: Setup or update Azure infrastructure
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Preview changes or apply infrastructure
+        type: choice
+        options: [preview, apply]
+        default: preview
+      plan:
+        description: Hosting plan (Free has no SLA)
+        type: choice
+        options: [Free, Standard]
+        default: Free
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: azure-infrastructure
+  cancel-in-progress: false
+jobs:
+  infrastructure:
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.ref == 'refs/heads/main'
+    env:
+      AZURE_RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+      AZURE_SWA: ${{ vars.AZURE_STATIC_WEB_APP }}
+      ADMIN_EMAIL: ${{ vars.BOOTSTRAP_ADMIN_EMAIL }}
+      PLAN: ${{ inputs.plan }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - run: az bicep build --file infra/main.bicep
+      - name: Preview infrastructure
+        if: inputs.mode == 'preview'
+        run: az deployment group what-if -g "$AZURE_RG" --template-file infra/main.bicep --parameters bootstrapAdminEmail="$ADMIN_EMAIL" appName="$AZURE_SWA" hostingPlan="$PLAN" --result-format ResourceIdOnly
+      - name: Apply infrastructure
+        if: inputs.mode == 'apply'
+        run: az deployment group create -g "$AZURE_RG" --name "eventqr-$GITHUB_RUN_NUMBER" --template-file infra/main.bicep --parameters bootstrapAdminEmail="$ADMIN_EMAIL" appName="$AZURE_SWA" hostingPlan="$PLAN" --output none
+      - name: Connect eventy.samychswoich.pl
+        if: inputs.mode == 'apply'
+        run: |
+          hostname=$(az staticwebapp show -g "$AZURE_RG" -n "$AZURE_SWA" --query defaultHostname -o tsv)
+          az network dns record-set cname set-record -g cloud-shell-storage-westeurope -z samychswoich.pl -n eventy -c "$hostname" --ttl 300 --output none
+          az staticwebapp hostname set -g "$AZURE_RG" -n "$AZURE_SWA" --hostname eventy.samychswoich.pl --validation-method cname-delegation --output none
