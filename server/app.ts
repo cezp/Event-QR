@@ -140,10 +140,22 @@ export function createApp(
   async function staff(req: FastifyRequest): Promise<Staff> {
     const p = getPrincipal(req);
     if (!p) return fail(401, "Zaloguj się kontem Microsoft.");
-    const email = p.userDetails.toLowerCase();
-    const key = hash(email);
+    const email = p.userDetails.trim().toLowerCase();
+    let key = hash(email);
     let row = await store.get<Staff>("users", key);
-    if (!row && email === options.bootstrapEmail?.toLowerCase()) {
+    // userDetails may be masked or change between requests. Once an account is
+    // bound, its trusted SWA userId identifies it; never use a displayed alias
+    // to discard that binding or inherit another account's permissions.
+    if (row?.value.principalId !== p.userId) {
+      const bound = (await store.list<Staff>("users")).find(
+        (candidate) => candidate.value.principalId === p.userId,
+      );
+      if (bound) {
+        row = bound;
+        key = hash(bound.value.email);
+      }
+    }
+    if (!row && email === options.bootstrapEmail?.trim().toLowerCase()) {
       try {
         await store.commit("users", [
           {

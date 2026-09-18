@@ -106,6 +106,124 @@ beforeEach(async () => {
 });
 afterEach(() => app.close());
 describe("Authentication, event scopes and request protection", () => {
+  it("keeps a bound administrator authorized when Microsoft userDetails is masked or changes", async () => {
+    const changedHeaders = (userDetails: string) => ({
+      ...headers(),
+      "x-ms-client-principal": Buffer.from(
+        JSON.stringify({
+          userId: "admin@example.test",
+          userDetails,
+          identityProvider: "aad",
+          userRoles: ["authenticated"],
+        }),
+      ).toString("base64"),
+    });
+    for (const details of [
+      "adm*****",
+      " NEW-ALIAS@example.test ",
+      "crew@example.test",
+    ]) {
+      const me = await app.inject({
+        url: "/api/me",
+        headers: changedHeaders(details),
+      });
+      expect(me.statusCode).toBe(200);
+      expect(me.json().user.email).toBe("admin@example.test");
+      expect(me.json().user.role).toBe("admin");
+      const saved = await app.inject({
+        method: "POST",
+        url: "/api/events",
+        headers: changedHeaders(details),
+        payload: event,
+      });
+      expect(saved.statusCode).toBe(200);
+      expect(
+        (
+          await app.inject({
+            url: `/api/events/${saved.json().id}/invitations`,
+            headers: changedHeaders(details),
+          })
+        ).statusCode,
+      ).toBe(200);
+    }
+  });
+
+  it("never grants an unbound identity access through a mask or another account's email", async () => {
+    for (const details of ["adm*****", "admin@example.test"]) {
+      const result = await app.inject({
+        url: "/api/events",
+        headers: {
+          "x-ms-client-principal": Buffer.from(
+            JSON.stringify({
+              userId: "unrecognized-identity",
+              userDetails: details,
+              identityProvider: "aad",
+              userRoles: ["authenticated"],
+            }),
+          ).toString("base64"),
+        },
+      });
+      expect(result.statusCode).toBe(403);
+    }
+  });
+
+  it("preserves event scopes and revocation for a bound identity with masked details", async () => {
+    expect(
+      (await request("GET", "/api/me", undefined, "crew@example.test"))
+        .statusCode,
+    ).toBe(200);
+    const masked = {
+      ...headers("crew@example.test"),
+      "x-ms-client-principal": Buffer.from(
+        JSON.stringify({
+          userId: "crew@example.test",
+          userDetails: "admin@example.test",
+          identityProvider: "aad",
+          userRoles: ["authenticated"],
+        }),
+      ).toString("base64"),
+    };
+    expect(
+      (
+        await app.inject({
+          url: `/api/events/${event.id}/invitations`,
+          headers: masked,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/api/events",
+          headers: masked,
+          payload: event,
+        })
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await app.inject({
+          url: `/api/events/${randomUUID()}/invitations`,
+          headers: masked,
+        })
+      ).statusCode,
+    ).toBe(403);
+    const key = createHash("sha256").update("crew@example.test").digest("hex");
+    const row = (await store.get<Record<string, unknown>>("users", key))!;
+    await store.commit("users", [
+      { key, version: row.version, value: { ...row.value, active: false } },
+    ]);
+    expect(
+      (
+        await app.inject({
+          url: `/api/events/${event.id}/invitations`,
+          headers: masked,
+        })
+      ).statusCode,
+    ).toBe(403);
+  });
+
   it("gives a global admin access to events without assignments while denying creation to scoped roles", async () => {
     const me = (await request("GET", "/api/me")).json().user;
     expect(me.role).toBe("admin");
