@@ -36,13 +36,16 @@ Host: https://eventy.samychswoich.pl
 - CSP, Referrer-Policy, manifest PWA i przekierowanie do logowania Microsoft są poprawne.
 - Po poprawce rozpoznawania konta: w istniejącej sesji Microsoft globalnego administratora utworzono i edytowano wydarzenie przez UI. Panel zespołu pokazał aktywnego administratora z dostępem do wszystkich wydarzeń; odczyt zaproszeń i ustawień platformy działał.
 - Usunięto tylko dwa wydarzenia utworzone podczas tej weryfikacji i ich trzy wpisy audytu. Pierwotne wydarzenie użytkownika „Test1” pozostało zapisane.
+- Po wdrożeniu ręcznego dodawania w sesji Microsoft utworzono fikcyjne zaproszenie z danymi rodzica, dziecka, telefonu, e-maila i notatki. Profil zawierał te dane i status Do weryfikacji, a historia autora oraz operację Utworzono zaproszenie z danymi rodziny. Po sprawdzeniu usunięto wyłącznie to testowe zaproszenie i jego wpis audytu. Istniejące zaproszenie użytkownika zachowano.
 
 Potwierdzone przebiegi GitHub:
 
-- [Testy i wdrożenie aplikacji](https://github.com/cezp/Event-QR/actions/runs/35355308387)
+- [Pełne dane w nowym zaproszeniu: 23 testy API, 4 E2E i wdrożenie](https://github.com/cezp/Event-QR/actions/runs/35363047595)
 - [Poprawka rozpoznawania administratora: 19 testów API, 3 E2E i wdrożenie](https://github.com/cezp/Event-QR/actions/runs/35359376645)
-- [Podgląd infrastruktury](https://github.com/cezp/Event-QR/actions/runs/35355370164)
-- [Prywatna kopia danych](https://github.com/cezp/Event-QR/actions/runs/35355380666)
+- [Podgląd infrastruktury na nowych akcjach](https://github.com/cezp/Event-QR/actions/runs/35363100528)
+- [Prywatna kopia danych na nowych akcjach](https://github.com/cezp/Event-QR/actions/runs/35363106538)
+
+Wszystkie trzy workflow zakończyły się sukcesem po aktualizacji checkout, setup-node i upload-artifact do v7 oraz Azure Login do v3. Sprawdzono adnotacje wszystkich zadań: brak ostrzeżeń o Node.js 20. Pozostał tylko komunikat informacyjny GitHub o planowanej migracji obrazu ubuntu-latest do Ubuntu 26.
 
 Pierwsza próba OIDC ujawniła nowy format subject GitHub zawierający niezmienne ID właściciela i repozytorium. Zaufanie w Entra poprawiono, a przebiegi powtórzono z wynikiem pozytywnym.
 
