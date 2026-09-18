@@ -999,7 +999,17 @@ function Workspace({
       )}
       {modal === "invite" && event && (
         <Modal title="Zaproś rodzinę" close={closeModal}>
-          <InviteCreator event={event} onCreated={refresh} />
+          <InviteCreator
+            event={event}
+            onCreated={(created) => {
+              const { qrToken, ...summary } = created;
+              setInvitations((current) => [
+                summary,
+                ...current.filter((item) => item.id !== created.id),
+              ]);
+            }}
+            onOpen={openProfile}
+          />
         </Modal>
       )}
       {modal === "scan" && event && (
@@ -1066,25 +1076,56 @@ function Stat({
 function InviteCreator({
   event,
   onCreated,
+  onOpen,
 }: {
   event: Event;
-  onCreated: () => Promise<void>;
+  onCreated: (invitation: InvitationView) => void;
+  onOpen: (id: string) => Promise<void>;
 }) {
-  const [phone, setPhone] = useState(""),
+  const [mode, setMode] = useState<"link" | "family">("link"),
+    [family, setFamily] = useState<Family>({
+      parents: [{ firstName: "", lastName: "" }],
+      children: [{ id: "", firstName: "", lastName: "" }],
+      phone: "",
+      secondPhone: "",
+      email: "",
+    }),
     [max, setMax] = useState(1),
     [note, setNote] = useState(""),
-    [path, setPath] = useState(""),
+    [created, setCreated] = useState<{
+      invitation: InvitationView;
+      registrationPath: string;
+    }>(),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   return (
     <div className="modal-body">
-      {path ? (
+      {created ? (
         <>
           <div className="success-heading">
             <CheckCheck />
             <h3>Zaproszenie jest gotowe</h3>
           </div>
-          <CopyLink path={path} />
+          {created.invitation.status === "pending" && (
+            <p className="info-box">
+              Dane rodziny zostały zapisane. Zaproszenie ma status „Do
+              weryfikacji”. Otwórz profil, aby sprawdzić dane i zaakceptować
+              zgłoszenie.
+            </p>
+          )}
+          <CopyLink path={created.registrationPath} />
+          {created.invitation.status === "pending" && (
+            <p className="form-intro">
+              Rodzic nie musi ponownie wpisywać danych. Po akceptacji pod tym
+              linkiem zobaczy zaproszenie z kodem QR.
+            </p>
+          )}
+          <button
+            className="button secondary full"
+            onClick={() => onOpen(created.invitation.id)}
+          >
+            Otwórz profil zaproszenia <ArrowRight size={18} />
+          </button>
         </>
       ) : (
         <form
@@ -1093,13 +1134,31 @@ function InviteCreator({
             setBusy(true);
             setError("");
             try {
-              const result = await api<{ registrationPath: string }>(
-                "/events/" + event.id + "/invitations",
-                "POST",
-                { phone, maxChildren: max, note },
-              );
-              setPath(result.registrationPath);
-              await onCreated();
+              const result = await api<{
+                invitation: InvitationView;
+                registrationPath: string;
+              }>("/events/" + event.id + "/invitations", "POST", {
+                phone: family.phone,
+                maxChildren: max,
+                note,
+                ...(mode === "family"
+                  ? {
+                      family: {
+                        parents: family.parents,
+                        children: family.children.map(
+                          ({ firstName, lastName }) => ({
+                            firstName,
+                            lastName,
+                          }),
+                        ),
+                        email: family.email,
+                        secondPhone: family.secondPhone,
+                      },
+                    }
+                  : {}),
+              });
+              setCreated(result);
+              onCreated(result.invitation);
             } catch (e) {
               setError((e as Error).message);
             } finally {
@@ -1107,32 +1166,87 @@ function InviteCreator({
             }
           }}
         >
+          <fieldset className="invite-method" disabled={busy}>
+            <legend>Jak dodać zaproszenie?</legend>
+            <label>
+              <input
+                type="radio"
+                name="invite-method"
+                value="link"
+                checked={mode === "link"}
+                onChange={() => {
+                  setMode("link");
+                  setError("");
+                }}
+              />
+              <span>
+                Link dla rodzica<small>Rodzic sam uzupełni dane</small>
+              </span>
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="invite-method"
+                value="family"
+                checked={mode === "family"}
+                onChange={() => {
+                  setMode("family");
+                  setMax((current) =>
+                    Math.max(current, family.children.length),
+                  );
+                  setError("");
+                }}
+              />
+              <span>
+                Wpisz dane rodziny<small>Uzupełnij zaproszenie teraz</small>
+              </span>
+            </label>
+          </fieldset>
           <p className="form-intro">
-            Zacznij od numeru ze wstępnych zapisów. Rodzic uzupełni pozostałe
-            dane przez prywatny link.
+            {mode === "link"
+              ? "Zacznij od numeru ze wstępnych zapisów. Rodzic uzupełni pozostałe dane przez prywatny link."
+              : "Wpisz dane co najmniej jednego rodzica, kontakt i dane dzieci. Zgłoszenie zostanie zapisane do weryfikacji."}
           </p>
-          <label>
-            Numer telefonu rodzica
-            <input
-              type="tel"
-              required
-              placeholder="+48 600 000 000"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-            />
-          </label>
+          {mode === "link" && (
+            <label>
+              Numer telefonu rodzica
+              <input
+                type="tel"
+                required
+                placeholder="+48 600 000 000"
+                value={family.phone}
+                onChange={(e) =>
+                  setFamily((current) => ({
+                    ...current,
+                    phone: e.target.value,
+                  }))
+                }
+              />
+            </label>
+          )}
           <label>
             Maksymalna liczba dzieci
             <input
               type="number"
               required
-              min={1}
+              min={mode === "family" ? family.children.length : 1}
               max={10}
               value={max}
               onChange={(e) => setMax(Number(e.target.value))}
             />
-            <small>Rodzic będzie mógł zgłosić najwyżej tyle dzieci.</small>
+            <small>
+              {mode === "link"
+                ? "Rodzic będzie mógł zgłosić najwyżej tyle dzieci."
+                : "Ustal limit miejsc, a następnie dodaj dzieci poniżej."}
+            </small>
           </label>
+          {mode === "family" && (
+            <FamilyFields
+              value={family}
+              onChange={setFamily}
+              maxChildren={max}
+            />
+          )}
           <label>
             Notatka dla zespołu <span className="optional">opcjonalnie</span>
             <textarea
@@ -1144,7 +1258,16 @@ function InviteCreator({
           </label>
           <ErrorBox message={error} />
           <button className="button primary full" disabled={busy}>
-            {busy ? <Spinner /> : <LinkIcon size={18} />}Utwórz prywatny link
+            {busy ? (
+              <Spinner />
+            ) : mode === "family" ? (
+              <Check size={18} />
+            ) : (
+              <LinkIcon size={18} />
+            )}
+            {mode === "family"
+              ? "Zapisz zaproszenie z danymi"
+              : "Utwórz prywatny link"}
           </button>
         </form>
       )}

@@ -348,6 +348,160 @@ describe("Authentication, event scopes and request protection", () => {
     );
   });
 });
+describe("Invitations entered by the organizing team", () => {
+  it.each(["admin@example.test", "manager@example.test"])(
+    "lets %s create a complete family with an auditable review step",
+    async (actor) => {
+      const suppliedId = randomUUID();
+      const family = {
+        ...parentData,
+        parents: [
+          ...parentData.parents,
+          { firstName: "Piotr", lastName: "Żółkowski" },
+        ],
+        children: [
+          {
+            ...parentData.children[0],
+            id: suppliedId,
+            checkedInAt: "2099-12-06T14:00:00Z",
+          },
+          { firstName: "Jan", lastName: "Żółkowski" },
+        ],
+        secondPhone: "+48 600 200 300",
+      };
+      const response = await request(
+        "POST",
+        `/api/events/${event.id}/invitations`,
+        {
+          phone: "+48 600 100 200",
+          maxChildren: 2,
+          note: "Notatka tylko dla zespołu",
+          family,
+          status: "approved",
+        },
+        actor,
+      );
+      expect(response.statusCode).toBe(200);
+      const { invitation, registrationPath } = response.json();
+      expect(invitation).toMatchObject({
+        status: "pending",
+        parents: family.parents,
+        email: family.email,
+        phone: "+48600100200",
+        secondPhone: "+48600200300",
+      });
+      expect(invitation.children).toHaveLength(2);
+      expect(
+        new Set(invitation.children.map((child: { id: string }) => child.id))
+          .size,
+      ).toBe(2);
+      expect(invitation.children[0].id).not.toBe(suppliedId);
+      expect(invitation.children[0].checkedInAt).toBeUndefined();
+      expect(invitation.family).toBeUndefined();
+      const base = `/api/events/${event.id}/invitations/${invitation.id}`;
+      const profile = (await request("GET", base, undefined, actor)).json();
+      expect(profile.history).toHaveLength(1);
+      expect(profile.history[0]).toMatchObject({
+        actor,
+        action: "Utworzono zaproszenie z danymi rodziny",
+        invitationId: invitation.id,
+      });
+      expect(profile.history[0].changes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ field: "parents", after: family.parents }),
+          expect.objectContaining({ field: "email", after: family.email }),
+        ]),
+      );
+      const publicPath =
+        "/api/public/registration/" + registrationPath.slice(3);
+      const pending = (await app.inject(publicPath)).json();
+      expect(pending.invitation.status).toBe("pending");
+      expect(pending.invitation.qrCode).toBeUndefined();
+      expect(pending.invitation.note).toBeUndefined();
+      const approval = await request(
+        "POST",
+        base + "/review",
+        { status: "approved", version: invitation.version },
+        actor,
+      );
+      expect(approval.statusCode).toBe(200);
+      expect((await app.inject(publicPath)).json().invitation.qrCode).toMatch(
+        /^SS1\./,
+      );
+    },
+  );
+
+  it("rejects incomplete families and exceeded child limits without saving any partial records", async () => {
+    for (const override of [
+      { parents: [] },
+      {
+        parents: [
+          parentData.parents[0],
+          parentData.parents[0],
+          parentData.parents[0],
+        ],
+      },
+      { children: [] },
+      { children: [parentData.children[0], parentData.children[0]] },
+      { email: "" },
+      { secondPhone: "bad" },
+    ]) {
+      const response = await request(
+        "POST",
+        `/api/events/${event.id}/invitations`,
+        {
+          phone: parentData.phone,
+          maxChildren: 1,
+          family: { ...parentData, ...override },
+        },
+      );
+      expect(response.statusCode).toBe(400);
+    }
+    expect(await store.list(event.id)).toEqual([]);
+  });
+
+  it("limits manual entry to administrators of an active event", async () => {
+    const payload = {
+      phone: parentData.phone,
+      maxChildren: 1,
+      family: parentData,
+    };
+    expect(
+      (
+        await request(
+          "POST",
+          `/api/events/${event.id}/invitations`,
+          payload,
+          "crew@example.test",
+        )
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await request(
+          "POST",
+          `/api/events/${randomUUID()}/invitations`,
+          payload,
+          "manager@example.test",
+        )
+      ).statusCode,
+    ).toBe(403);
+    expect(
+      (
+        await request("PUT", `/api/events/${event.id}`, {
+          ...event,
+          status: "closed",
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (await request("POST", `/api/events/${event.id}/invitations`, payload))
+        .statusCode,
+    ).toBe(400);
+    expect(await store.list(event.id)).toEqual([]);
+  });
+});
+
 describe("Private parent registration", () => {
   it("requires one parent and email; enforces child limit", async () => {
     const c = await invite(),

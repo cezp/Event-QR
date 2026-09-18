@@ -5,14 +5,18 @@ Data: 18 września 2026.
 ## Automatyczne testy
 
 - TypeScript oraz produkcyjny build Vite i Azure Functions: poprawne.
-- 19 testów API: pełny dostęp globalnego administratora bez przypisania do wydarzeń, tożsamość z zamaskowanym lub zmienionym userDetails, odmowa przejęcia uprawnień przez inne userId, zakresy wydarzeń i odebranie dostępu.
-- 3 scenariusze E2E: przechodzą lokalnie w Microsoft Edge oraz w Chromium na runnerze GitHub Actions.
+- 23 testy API: rejestracja rodziców, ręczne dodawanie pełnych danych, role, audyt, limit dzieci, weryfikacja, QR i obecność; dodatkowo rozpoznawanie konta po stabilnym userId i odebranie dostępu.
+- 4 scenariusze E2E: testowane lokalnie w Microsoft Edge oraz w Chromium na runnerze GitHub Actions.
 - npm audit: brak zgłoszonych podatności dla zainstalowanych zależności.
 - Test na rzeczywistym Azure Table Storage: transakcja dwóch rekordów, odczyt, zapytanie, aktualizacja ETag i odrzucenie starej wersji. Syntetyczne rekordy usunięto po teście.
 
 Test E2E obejmuje tworzenie wydarzenia, prywatnego linku, formularz rodzica na ekranie telefonu, akceptację zgłoszenia, wyświetlenie QR, odczyt kodu w skanerze przez pole ręczne, zamianę dziecka z powodem, przyjęcie, historię i wyjście. Osobny scenariusz weryfikuje ograniczony interfejs crew i komunikat o braku sieci.
 
 Test regresji zapisu wydarzenia wymusza błędy odczytu listy wydarzeń i zaproszeń po udanym zapisie. Formularz zamyka się, pokazuje potwierdzenie i wybiera zapisane wydarzenie bez powtórnego POST. Dwie kolejne edycje wykorzystują nowy ETag z odpowiedzi zapisu i również działają bez dodatkowego odczytu listy.
+
+Scenariusz ręcznego zaproszenia obejmuje dwoje rodziców, dwoje dzieci, oba telefony, e-mail, zachowanie danych przy zmianie sposobu zapisu, status Do weryfikacji, audyt autora i akceptację. Osobna sesja rodzica otwiera wygenerowany link i widzi QR. Sprawdzono formularz na tablecie 800×1000 i telefonie 390×844.
+
+Każdy lokalny przebieg E2E uruchamia własny serwer i plik danych w katalogu tymczasowym systemu, poza synchronizacją OneDrive. Serwer API podczas E2E działa bez obserwowania zmian plików.
 
 W sesji produkcyjnej odtworzono naprzemienne przekazywanie pełnego i zamaskowanego userDetails. Odczyt konta po samym adresie odrzucał część żądań poprawnie zalogowanego administratora. Testy regresji używają tego samego userId z pełnym adresem, maską, nowym aliasem i adresem innego użytkownika; weryfikują zachowanie uprawnień faktycznie powiązanego konta.
 

@@ -1,4 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
+import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 export default defineConfig({
   timeout: 120000,
   expect: { timeout: 15000 },
@@ -21,9 +24,16 @@ export default defineConfig({
   webServer: process.env.E2E_URL
     ? undefined
     : {
-        command: "npm run dev",
+        command: "npm run dev:e2e",
+        env: {
+          LOCAL_DATA_PATH: join(
+            tmpdir(),
+            "eventqr-e2e",
+            randomUUID() + ".json",
+          ),
+        },
         url: "http://127.0.0.1:5173/api/health",
-        reuseExistingServer: !process.env.CI,
+        reuseExistingServer: false,
         timeout: 120000,
       },
 });

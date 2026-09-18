@@ -91,7 +91,9 @@ test("full family journey, substitution, QR lookup and attendance history", asyn
   await page.getByLabel("Numer telefonu rodzica").fill("+48600777888");
   await page.getByLabel("Maksymalna liczba dzieci").fill("2");
   await page.getByRole("button", { name: "Utwórz prywatny link" }).click();
-  const link = await page.getByLabel("Link dla rodzica").inputValue();
+  const link = await page
+    .getByRole("textbox", { name: "Link dla rodzica", exact: true })
+    .inputValue();
   expect(link).toContain("/r/");
   const parentContext = await browser.newContext({
     baseURL: page.url(),
@@ -212,6 +214,104 @@ test("full family journey, substitution, QR lookup and attendance history", asyn
   });
   await parentContext.close();
 });
+test("staff enters a complete family, reviews it and gives the parent a working QR link", async ({
+  page,
+  browser,
+}) => {
+  await page.setViewportSize({ width: 800, height: 1000 });
+  await page.goto("/");
+  await expect(page.locator(".brand")).toContainText("Samych Swoich");
+  await page.getByRole("link", { name: "Logowanie dla zespołu" }).click();
+  await page
+    .getByRole("combobox", { name: "Wybierz wydarzenie" })
+    .selectOption("a1111111-1111-4111-8111-111111111111");
+  await page.getByRole("button", { name: /^Zaproszenia/ }).click();
+  await page.getByRole("button", { name: "Nowe zaproszenie" }).click();
+  await page.getByLabel("Numer telefonu rodzica").fill("+48600555444");
+  await page.getByRole("radio", { name: /Wpisz dane rodziny/ }).check();
+  await expect(
+    page.getByLabel("Telefon kontaktowy", { exact: true }),
+  ).toHaveValue("+48600555444");
+  await page.getByLabel("Maksymalna liczba dzieci").fill("2");
+  await page.getByRole("button", { name: "Dodaj drugiego rodzica" }).click();
+  await page.getByLabel("Imię", { exact: true }).nth(0).fill("Anna");
+  await page.getByLabel("Nazwisko", { exact: true }).nth(0).fill("Wpisowska");
+  await page.getByLabel("Imię", { exact: true }).nth(1).fill("Piotr");
+  await page.getByLabel("Nazwisko", { exact: true }).nth(1).fill("Wpisowski");
+  await page.getByLabel("Drugi telefon").fill("+48600555333");
+  await page.getByLabel("Adres e-mail").fill("wpisana@example.test");
+  await page.getByRole("button", { name: "Dodaj kolejne dziecko" }).click();
+  await page.getByLabel("Imię dziecka", { exact: true }).nth(0).fill("Maja");
+  await page
+    .getByLabel("Nazwisko dziecka", { exact: true })
+    .nth(0)
+    .fill("Wpisowska");
+  await page.getByLabel("Imię dziecka", { exact: true }).nth(1).fill("Jan");
+  await page
+    .getByLabel("Nazwisko dziecka", { exact: true })
+    .nth(1)
+    .fill("Wpisowski");
+  await expect(
+    page.getByRole("button", { name: "Dodaj kolejne dziecko" }),
+  ).toHaveCount(0);
+  await page
+    .getByLabel("Notatka dla zespołu")
+    .fill("Dane testowe wpisane przez organizatora.");
+  await page.getByRole("radio", { name: /Link dla rodzica/ }).check();
+  await page.getByRole("radio", { name: /Wpisz dane rodziny/ }).check();
+  await expect(page.getByLabel("Imię", { exact: true }).nth(1)).toHaveValue(
+    "Piotr",
+  );
+  await expect(
+    page.getByLabel("Imię dziecka", { exact: true }).nth(1),
+  ).toHaveValue("Jan");
+  await page.screenshot({ path: "artifacts/manual-invitation-tablet.png" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+  await page
+    .getByRole("button", { name: "Zapisz zaproszenie z danymi" })
+    .scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "artifacts/manual-invitation-mobile.png" });
+  await page
+    .getByRole("button", { name: "Zapisz zaproszenie z danymi" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Zaproszenie jest gotowe" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Zaproszenie ma status „Do weryfikacji”/),
+  ).toBeVisible();
+  const link = await page
+    .getByRole("textbox", { name: "Link dla rodzica", exact: true })
+    .inputValue();
+  await page.getByRole("button", { name: "Otwórz profil zaproszenia" }).click();
+  await expect(page.getByText("Maja Wpisowska", { exact: true })).toBeVisible();
+  await expect(page.getByText("Jan Wpisowski", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: /Historia/ }).click();
+  await expect(
+    page.getByText("Utworzono zaproszenie z danymi rodziny", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Dane i obecność" }).click();
+  await page.getByRole("button", { name: "Akceptuj zgłoszenie" }).click();
+  await expect(
+    page.getByText("Zgłoszenie zaakceptowane. Kod QR jest już dostępny."),
+  ).toBeVisible();
+  const parentContext = await browser.newContext();
+  const parent = await parentContext.newPage();
+  await parent.goto(link);
+  await expect(
+    parent.getByRole("img", { name: "Indywidualny kod QR zaproszenia" }),
+  ).toBeVisible();
+  await expect(
+    parent.getByText("Maja Wpisowska", { exact: true }),
+  ).toBeVisible();
+  await parentContext.close();
+});
+
 test("crew has no administrative screens and offline confirmation is disabled", async ({
   page,
   context,

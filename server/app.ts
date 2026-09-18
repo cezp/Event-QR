@@ -425,23 +425,31 @@ export function createApp(
     const event = (await eventById(eventId)).value;
     if (event.status === "closed")
       return fail(400, "Wydarzenie zostało zakończone.");
-    const data = z
+    const { family, ...data } = z
       .object({
         phone,
         maxChildren: z.number().int().min(1).max(10),
         note: z.string().max(1000).default(""),
+        family: familySchema.omit({ phone: true }).optional(),
       })
       .parse(req.body);
+    if (family && family.children.length > data.maxChildren)
+      return fail(400, "Przekroczono liczbę dzieci w zaproszeniu.");
     const rawToken = token();
     const inv: Invitation = {
       ...data,
       id: randomUUID(),
       eventId,
-      parents: [],
-      children: [],
-      email: "",
-      secondPhone: "",
-      status: "invited",
+      parents: family?.parents || [],
+      children:
+        family?.children.map(({ firstName, lastName }) => ({
+          id: randomUUID(),
+          firstName,
+          lastName,
+        })) || [],
+      email: family?.email || "",
+      secondPhone: family?.secondPhone || "",
+      status: family ? "pending" : "invited",
       createdAt: now(),
       updatedAt: now(),
       expiresAt: event.endsAt,
@@ -455,7 +463,9 @@ export function createApp(
       inv,
       undefined,
       u.email,
-      "Utworzono zaproszenie",
+      family
+        ? "Utworzono zaproszenie z danymi rodziny"
+        : "Utworzono zaproszenie",
       inv.id,
     );
     return {

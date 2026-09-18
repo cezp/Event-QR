@@ -10,6 +10,7 @@
     "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:web\"",
     "dev:api": "tsx watch server/dev.ts",
     "dev:web": "vite --host 127.0.0.1",
+    "dev:e2e": "concurrently -k \"node --import tsx server/dev.ts\" \"vite --host 127.0.0.1\"",
     "build": "tsc --noEmit && vite build && node scripts/build-api.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",

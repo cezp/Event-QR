@@ -11,7 +11,7 @@ Platforma wydarzeń Dobrzykowickiego Stowarzyszenia Samych Swoich. Polski interf
 
 - Wiele wydarzeń: szkic, zapisy otwarte, w trakcie, zakończone.
 - Role administrator, administrator wydarzenia i obsługa wejścia. Uprawnienia sprawdza API przy każdej operacji.
-- Link dla rodzica tworzony na podstawie telefonu i maksymalnej liczby dzieci. Można wprowadzić dane również ręcznie w profilu.
+- Nowe zaproszenie: prywatny link na podstawie telefonu i limitu dzieci albo pełne dane rodziny wpisane od razu przez organizatora. Dane można później poprawić w profilu.
 - Jeden lub dwoje rodziców, e-mail, główny telefon i opcjonalny drugi telefon.
 - Kolejka zgłoszeń do weryfikacji. QR udostępniany po akceptacji.
 - Skanowanie aparatem, ręczne podanie kodu i wyszukiwanie nazwisk z podpowiedziami, także bez polskich znaków.
@@ -56,6 +56,8 @@ Push na main uruchamia **Test and deploy application**. Deploy następuje po kom
 
 GitHub loguje się do Azure przez OIDC. Nie zapisujemy sekretu service principal ani tokenu deploymentu w repozytorium. Tożsamość ma Contributor tylko w RG aplikacji oraz DNS Zone Contributor tylko do strefy samychswoich.pl. Skrypty configure-identity.ps1 i configure-ci.mjs dokumentują konfigurację startową.
 
+Workflow używa actions/checkout@v7, actions/setup-node@v7, actions/upload-artifact@v7 oraz azure/login@v3, działających na Node.js 24. Node.js 22 ustawiany przez setup-node jest wersją aplikacji zgodną z Azure Functions. Azure/static-web-apps-deploy@v1 jest akcją kontenerową (Docker), niezależną od środowiska Node akcji.
+
 Kod infrastruktury znajduje się w infra/main.bicep. Tworzy SWA, Storage, tabelę eventqr i prywatny kontener backups. Ustawienia API zawierają klucz Storage i adres pierwszego administratora.
 
 ## DNS
@@ -75,7 +77,7 @@ Azure wystawia i odnawia certyfikat TLS. Workflow aplikacji używa adresu techni
 1. Zaloguj się kontem Microsoft i utwórz wydarzenie.
 2. W Zespół i uprawnienia dodaj adresy kont Microsoft obsługi, nadaj role i przypisz wydarzenia.
 3. Ustaw wydarzenie na Zapisy otwarte.
-4. Utwórz zaproszenie: telefon ze wstępnych zapisów i limit dzieci. Skopiuj link i przekaż właściwej rodzinie.
+4. W Nowe zaproszenie wybierz Link dla rodzica (telefon i limit dzieci) albo Wpisz dane rodziny (rodzice, dzieci, e-mail i telefony). Wpisane przez organizatora dane zapisują się jako Do weryfikacji; przycisk Otwórz profil zaproszenia prowadzi do akceptacji. Link pozostaje dostępny w obu wariantach.
 5. Zweryfikuj zgłoszenia. Po akceptacji rodzic zobaczy QR pod swoim linkiem.
 6. Przed wydarzeniem wybierz W trakcie. Na tablecie otwórz Obsługa wejścia.
 7. Zeskanuj QR lub wpisz nazwisko. Sprawdź dane, w razie potrzeby edytuj z powodem i potwierdź każde dziecko osobno.

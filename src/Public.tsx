@@ -20,7 +20,7 @@ export function Brand() {
     <a href="/" className="brand">
       <img src="/logo.png" alt="Sami Swoi Dobrzykowice" />
       <span>
-        samych swoich<span>WYDARZENIA</span>
+        Samych Swoich<span>WYDARZENIA</span>
       </span>
     </a>
   );

@@ -24,6 +24,8 @@ Link rodzica zawiera losowe 256 bitów. W bazie przechowywany jest wyłącznie s
 
 Formularz zbiera tylko imiona i nazwiska, e-mail i telefony. Główny telefon pochodzi ze wstępnego zapisu. Rodzic nie może ominąć limitu dzieci ani samodzielnie zatwierdzić zaproszenia. Ponowna wysyłka zaakceptowanego lub oczekującego zgłoszenia jest blokowana.
 
+Globalny administrator i administrator przypisanego wydarzenia mogą od razu utworzyć zaproszenie z pełnymi danymi rodziny. API waliduje co najmniej jednego rodzica, e-mail, telefony i limit dzieci, nadaje dzieciom nowe identyfikatory oraz zapisuje status pending wraz z audytem autora w jednej transakcji. QR jest udostępniany rodzicowi po osobnej akceptacji. Bez danych rodziny powstaje dotychczasowe zaproszenie invited z linkiem do uzupełnienia. Crew nie może tworzyć żadnego z wariantów.
+
 ## Spójność
 
 Każda korekta zaproszenia i wpis audytu są zapisywane w jednej transakcji Table Storage, w partycji danego wydarzenia. Operacje stosują ETag. Stare formularze zwracają 409 zamiast nadpisywać nowe dane. Równoczesne skany nie naliczają podwójnego wejścia. Powtórzenie wejścia już obecnego dziecka jest idempotentne.
