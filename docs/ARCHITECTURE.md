@@ -8,6 +8,8 @@ Azure Static Web Apps weryfikuje konto Microsoft i dostarcza podpisaną przez pl
 
 API dopuszcza wyłącznie Microsoft (aad), a następnie sprawdza aktywne konto na liście zespołu. Pierwsze logowanie wiąże dopuszczony adres e-mail ze stabilnym userId. Administrator startowy jest wskazany przez BOOTSTRAP_ADMIN_EMAIL. Pozostałe konta tworzy globalny administrator. MFA stosuje dostawca tożsamości; zalecane jest wymaganie MFA dla zespołu w Entra.
 
+Po powiązaniu konta uprawnienia są rozpoznawane po principalId odpowiadającym zaufanemu userId SWA. Jeśli userDetails jest zamaskowane, zmieniło się lub wskazuje adres innego wpisu, API odnajduje wcześniej powiązane konto. Zachowuje jego rolę, zakres wydarzeń i stan active. Nieznany userId nie przejmuje konta już powiązanego z innym identyfikatorem. Nie stosujemy dopasowania po prefiksie zamaskowanego adresu.
+
 - admin: wszystkie wydarzenia, zespół i tryb przerwy;
 - event_admin: wyłącznie przydzielone wydarzenia, zaproszenia i akceptacja;
 - crew: tylko przydzielone wydarzenia, odczyt i wejścia/wyjścia; korekty zaakceptowanych zaproszeń w trakcie wydarzenia.
