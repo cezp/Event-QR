@@ -168,6 +168,14 @@ function Workspace({
       result.some((e) => e.id === current) ? current : result[0]?.id || "",
     );
   }, []);
+  const rememberEvent = (saved: Event) => {
+    setEvents((current) =>
+      [...current.filter((item) => item.id !== saved.id), saved].sort((a, b) =>
+        b.startsAt.localeCompare(a.startsAt),
+      ),
+    );
+    setEventId(saved.id);
+  };
   useEffect(() => {
     if (eventId) localStorage.setItem("eventqr-selected-event", eventId);
   }, [eventId]);
@@ -498,8 +506,8 @@ function Workspace({
               ) : page === "eventsettings" ? (
                 <EventEditor
                   event={event}
-                  onSave={async () => {
-                    await refreshEvents();
+                  onSave={(saved) => {
+                    rememberEvent(saved);
                     notify("Zapisano wydarzenie.");
                   }}
                 />
@@ -981,9 +989,8 @@ function Workspace({
       {modal === "event" && (
         <Modal title="Nowe wydarzenie" close={closeModal}>
           <EventEditor
-            onSave={async (created) => {
-              await refreshEvents();
-              if (created) setEventId(created.id);
+            onSave={(created) => {
+              rememberEvent(created);
               closeModal();
               notify("Wydarzenie jest gotowe.");
             }}
@@ -1155,7 +1162,7 @@ function EventEditor({
   onSave,
 }: {
   event?: Event;
-  onSave: (e?: Event) => Promise<void>;
+  onSave: (e: Event) => void;
 }) {
   const [form, setForm] = useState({
     name: event?.name || "",

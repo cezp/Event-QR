@@ -164,11 +164,13 @@ export function createApp(
       }
       row = await store.get<Staff>("users", key);
     }
-    if (!row?.value.active)
+    if (!row)
       return fail(
         403,
-        "To konto nie ma dostępu. Poproś administratora o dodanie do zespołu.",
+        `Konto „${email}” nie jest dodane do zespołu. Poproś administratora o nadanie dostępu.`,
       );
+    if (!row.value.active)
+      return fail(403, `Dostęp konta „${email}” został wyłączony.`);
     if (row.value.principalId && row.value.principalId !== p.userId)
       return fail(
         403,

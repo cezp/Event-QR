@@ -1,4 +1,71 @@
 import { test, expect } from "@playwright/test";
+test("a successful event save survives a failed background refresh without duplicate creation", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("link", { name: "Logowanie dla zespołu" }).click();
+  await expect(
+    page.getByRole("button", { name: "Nowe wydarzenie" }),
+  ).toBeVisible();
+  let creates = 0;
+  let saves = 0;
+  page.on("request", (request) => {
+    if (
+      new URL(request.url()).pathname === "/api/events" &&
+      request.method() === "POST"
+    )
+      creates++;
+    if (
+      /\/api\/events\/[^/]+$/.test(new URL(request.url()).pathname) &&
+      request.method() === "PUT"
+    )
+      saves++;
+  });
+  await page.route("**/api/events", async (route) => {
+    if (route.request().method() === "GET") {
+      await route.fulfill({
+        status: 403,
+        json: { error: "Odmowa odświeżenia listy" },
+      });
+    } else await route.continue();
+  });
+  await page.route("**/api/events/*/invitations", (route) =>
+    route.fulfill({
+      status: 503,
+      json: { error: "Chwilowy błąd odświeżenia zaproszeń" },
+    }),
+  );
+  const name = "Zapis bez duplikatu " + Date.now();
+  await page.getByRole("button", { name: "Nowe wydarzenie" }).click();
+  await page.getByLabel("Nazwa wydarzenia").fill(name);
+  await page.getByLabel("Początek", { exact: true }).fill("2099-12-06T15:00");
+  await page.getByLabel("Koniec", { exact: true }).fill("2099-12-06T19:00");
+  await page.getByRole("button", { name: "Zapisz wydarzenie" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(
+    page.getByText("Wydarzenie jest gotowe.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name, exact: true })).toBeVisible();
+  expect(creates).toBe(1);
+  await page
+    .getByRole("button", { name: "Ustawienia wydarzenia", exact: true })
+    .click();
+  for (const suffix of ["poprawione", "ponownie"]) {
+    await page.getByLabel("Nazwa wydarzenia").fill(name + " " + suffix);
+    await page.getByRole("button", { name: "Zapisz wydarzenie" }).click();
+    await expect(
+      page.getByText("Zapisano wydarzenie.", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      page
+        .getByRole("combobox", { name: "Wybierz wydarzenie" })
+        .locator("option:checked"),
+    ).toHaveText(name + " " + suffix);
+  }
+  expect(creates).toBe(1);
+  expect(saves).toBe(2);
+});
+
 test("full family journey, substitution, QR lookup and attendance history", async ({
   page,
   browser,

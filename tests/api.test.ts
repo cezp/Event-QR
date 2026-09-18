@@ -106,6 +106,34 @@ beforeEach(async () => {
 });
 afterEach(() => app.close());
 describe("Authentication, event scopes and request protection", () => {
+  it("gives a global admin access to events without assignments while denying creation to scoped roles", async () => {
+    const me = (await request("GET", "/api/me")).json().user;
+    expect(me.role).toBe("admin");
+    expect(me.eventIds).toEqual([]);
+    expect(
+      (await request("GET", `/api/events/${event.id}/invitations`)).statusCode,
+    ).toBe(200);
+    const saved = await request("PUT", `/api/events/${event.id}`, {
+      ...event,
+      name: "Zmienione wydarzenie",
+    });
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json().name).toBe("Zmienione wydarzenie");
+    for (const email of ["manager@example.test", "crew@example.test"]) {
+      expect(
+        (await request("POST", "/api/events", event, email)).statusCode,
+      ).toBe(403);
+    }
+    const key = createHash("sha256").update(me.email).digest("hex");
+    const row = (await store.get<typeof me>("users", key))!;
+    await store.commit("users", [
+      { key, version: row.version, value: { ...row.value, active: false } },
+    ]);
+    const disabled = await request("POST", "/api/events", event);
+    expect(disabled.statusCode).toBe(403);
+    expect(disabled.json().error).toContain("został wyłączony");
+  });
+
   it("denies anonymous and unlisted users, and rejects forged providers", async () => {
     expect((await app.inject("/api/events")).statusCode).toBe(401);
     expect(
